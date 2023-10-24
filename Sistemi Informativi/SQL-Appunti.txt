@@ -1,0 +1,101 @@
+-SINTASSI-
+
+
+--------------------------------------------------------------------------------------------------------------------------
+RAGGRUPPAMENTI: agiscono tutti sulla SELECT
+N.B. La select non può includere elementi che non siano aggregate! Non posso fare quindi una select di nome e di MAX(Stipendio)
+
+1. Funzioni aggregate
+
+- SUM: opera sulla tabella risultante dalle clausole FROM e WHERE
+
+Esempio (se sono tutti null, restituisce NULL):  		SELECT SUM(Stipendio) AS TotaleStipendi FROM Imp WHERE Sede='01'
+Esempio con Distinct (considera solo valori distinti):  	SELECT SUM(DISTINCT Stipendio) AS TotaleStipendi FROM Imp WHERE Sede='01' 
+
+- COUNT: conta le tuple del risultato
+
+Esempio (può esserci * o un attributo, in quel caso: NULL ignorati ): 		SELECT COUNT(*)AS NumImpS01 FROM Imp WHERE Sede = ‘S01’
+
+- AVG: calcola la media 
+N.B. Bisogna ricordarsi il casting 
+
+Esempio senza casting (impreciso):			SELECT AVG(Stipendio) AS AvgStip FROM Imp
+Esempio senza casting:					SELECT AVG(CAST(STIPENDIO as Decimal(6,2))) AS AvgStip FROM Imp
+oppure							SELECT AVG(Stipendio/1.0) AS AvgStip FROM Imp
+
+2. Clausole aggiuntive
+- GROUP BY: Permette alla select di includere anche colonne dette "di raggruppamento" oltre elementi aggregate
+
+Esempio con una colonna: 		SELECT I.Ruolo, 	 AVG(I.Stipendio) AS AvgStip FROM Imp I JOIN Sedi S ON (I.Sede = S.Sede) WHERE S.Citta = ‘Milano’ GROUP BY I.Ruolo
+Esempio con due colonne: 		SELECT I.Sede, I.Ruolo, AVG(I.Stipendio) FROM Imp I JOIN Sedi S ON (I.Sede = S.Sede) WHERE S.Citta = ‘Milano’ GROUP BY I.Sede, I.Ruolo
+
+- HAVING: Permette di selezionare gruppi in base a proprietà complessive
+
+Esempio ottenere gli stipendi massimi minori di una soglia: 		SELECT Sede, COUNT(*) AS NumImp FROM Imp GROUP BY Sede HAVING MAX(Stipendio) <= 2000
+
+
+ESEMPIO COMPLETO: Per ogni sede di Bologna in cui il numero di impiegati è almeno 3, si vuole conoscere il valor medio degli stipendi, ordinando il risultato per valori decrescenti di stipendio medio e quindi per sede 
+
+SELECT I.Sede, AVG(Stipendio) AS AvgStipendio 
+FROM Imp I, Sedi S 
+WHERE I.Sede = S.Sede ANDS.Citta = ‘Bologna’
+GROUP BY I.Sede 
+HAVING COUNT(*) >= 3 
+ORDER BY AvgStipendio DESC, Sede
+
+-----------------------------------------------------------------------------------------------------------------
+SUBQUERY: Condizioni che si basano sul risultato di altre interrogazioni
+
+- In: 
+Esempio caso generale: confrontare tra loro tuple anzichè singoli valori:
+Select CodImp
+From Imp
+Where Sede <> 'S01'
+AND Ruolo IN (SELECT Ruolo --, Stipendio
+		From Imp
+		Where Sede = 'S01')
+AND Stipendio IN (SELECT Stipendio
+		From Imp
+		Where Sede = 'S01')
+
+- Subquery scalari: Possono restituire solo una tupla, dà errore se ha più di un risultato.
+Se la query può restituire più di un valore, si usano le forme ANY(per almeno uno dei valori) 
+ed ALL (per tutti i valori). (seguono ad un operatore, ad es. =, <= ... )
+
+SELECT   Responsabile 
+FROM	Sedi 
+WHERE    Sede = ANY (SELECT   Sede
+		     FROM     Imp 
+		     WHERE    Stipendio > 1500) 
+
+SELECT   CodImp --impiegati con stipendio minimo 
+FROM     Imp 
+WHERE    Stipendio <= ALL(SELECT   Stipendio
+			  FROM	   Imp)
+
+- EXISTS: Verifica se il risultato di una query restituisce almeno una tupla
+- NOT EXISTS: Viceversa
+Esempio: Sedi in cui sono presenti tutti i ruoli equivale a Sedi in cui non esist eun ruolo non presente
+
+SELECT Sede FROM Sedi S 
+WHERE  NOT EXISTS (SELECT * FROM Imp I1 
+		   WHERE NOT EXISTS (SELECT * FROM Imp I2 
+		   WHERE S.Sede = I2.Sede
+		   AND I1.Ruolo = I2.Ruolo))
+
+
+- Aggiornamento dei dati: Aggiornare i dati di una tabella sulla base di criteri che dipendono dal contenuto di altre tabelle
+
+DELETE FROM Imp --elimina gli impiegati di Bologna
+WHERE  Sede IN (SELECT Sede 
+		FROM Sedi
+		WHERE  Citta = ‘Bologna’) 
+
+UPDATE Imp
+SET Stipendio = 1.1*Stipendio
+WHERE  Sede IN (SELECT S.Sede
+		FROM   Sede S, Prog P
+		WHERE  S.Citta = P.Citta AND  P.CodProg = ‘P02’)
+
+
+
